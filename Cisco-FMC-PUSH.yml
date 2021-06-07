@@ -46,6 +46,10 @@
       command: "du -h {{latest_file.path}}"
       register: informationAboutFile
 
+    - name:
+      debug:
+        msg: "Ovo je info: {{informationAboutFile.stdout_lines[0]}}"
+
 
     - name: Get the size of file
       set_fact:
