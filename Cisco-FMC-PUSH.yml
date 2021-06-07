@@ -73,10 +73,10 @@
         success_msg: "Validation Succeeded"
       register: validation_results
 
-    # #This Task renames backup file and add _Validate.tar as suffix.
-    # - name: "Rename Cisco FMC Backup File as Validated"
-    #   command: "mv {{ latest_file.path }} {{ latest_file.path | regex_replace('.tar$','')}}_Validated{{ file_extention }}"
-    #   when: validation_results is succeeded
+    #This Task renames backup file and add _Validate.tar as suffix.
+    - name: "Rename Cisco FMC Backup File as Validated"
+      command: "mv {{ latest_file.path }} {{ latest_file.path | regex_replace('.tar$','')}}_Validated{{ file_extention }}"
+      when: validation_results is succeeded
 
   #------------------------------------------------------------------------------------------------
 
@@ -100,7 +100,7 @@
         paths: "{{ backup_dir }}/{{ client_name }}"
         patterns: "*{{ file_extention }}"
         #use_regex: true
-        age: "{{remove_files_older_than_days}}d"
+        age: "{{remove_files_older_than_days}}h"
       register: files_to_delete
 
     - name: See the files ----->
