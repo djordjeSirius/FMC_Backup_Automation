@@ -109,11 +109,11 @@
       with_items: "{{files_to_delete.files}}"
 
     #This Task deletes all the files found by above task
-    # - name: Delete files older than {{remove_files_older_than_days}} days  (Backup Server)
-    #   file:
-    #     path: "{{ item.path }}"
-    #     state: absent
-    #   with_items: "{{ files_to_delete.files }}"
+    - name: Delete files older than {{remove_files_older_than_days}} days  (Backup Server)
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ files_to_delete.files }}"
 
       #This Task fails the task if disk space is lower than the specified limit
     - name: Ensure Disk Space On Backup Server is Under Warning Limit
