@@ -1,0 +1,123 @@
+---
+- name: Cisco FMC Backup
+  hosts: fmcServer
+  gather_facts: no
+  vars:
+    file_extention: ".tar"
+    backup_dir: "/home/djordje/backups"
+    client_name: "CiscoFMC/"
+    backup_file_pattern: "*.tar"
+  tasks:
+
+    #This task list files in backup folder located in FMC backup folder 
+    - name: List Files Created Today In Backups Directory on Backup Server CiscoFMC-Backups Folder
+      find:
+        paths: "{{ backup_dir }}/{{ client_name }}"
+        patterns: "{{ backup_file_pattern }}"
+        age: "-1d"
+        #use_regex: true
+      register: found_files
+
+    #This task checks if any backup file is found to operate else Fails this playbook.
+    - name: Check if Above Task Found Any Backup File
+      assert:
+        that:
+         - found_files is succeeded
+         - found_files.matched > 0
+        fail_msg: "No Backup File Found. Failing this Playbook"
+        success_msg: "{{found_files.matched}} --> Backup File Found. Continue..."
+
+    #This task gets the latest file from all files create today in backup directory
+    - name: Get latest backup flle
+      set_fact:
+        latest_file: "{{ found_files.files | sort(attribute='mtime',reverse=true) | first }}"
+
+    #Check if the latest backup file is not added for some reason. That meens that the latest file
+    #that we have on our server will have "_Validated" in it
+    - name: See if FMC uploaded backup file in our server
+      assert:
+        that:
+          - latest_file is not search("_Validated")
+        fail_msg: "FMC has not uploaded backup file this time"
+        success_msg: "FMC has uploaded backup file this time"
+
+    #Get the information about Backup file
+    - name: Get information about file
+      command: "du -h {{latest_file.path}}"
+      register: informationAboutFile
+
+
+    - name: Get the size of file
+      set_fact:
+        size_of_backup_file: "{{informationAboutFile.stdout_lines[0] | split('M') | first}}"
+   
+
+    #Note: you can only test -t with tgz as it compreses the file and keep meta data. if its only tar its just a wrapper around the file, so no meta
+    - name: Trying To Unarchive to Validate Integrety of Backup File
+      shell: "tar -tf {{ latest_file.path }}" #if tar finds error it will return non zero value (t arg); NOT REALY!!
+      args:
+        warn: no
+      register: untar_results
+      ignore_errors: True
+
+    
+    #This task checks validation_results variable and Passes or Fails this playbook.
+    - name: Check Cisco FMC Validation Results
+      assert:
+        that:
+         - untar_results is succeeded
+         - untar_results is search("ims.conf")
+         - untar_results is search("sru_versions.conf")
+         - size_of_backup_file|int > 100
+        fail_msg: "Validation Failed"
+        success_msg: "Validation Succeeded"
+      register: validation_results
+
+    # #This Task renames backup file and add _Validate.tar as suffix.
+    # - name: "Rename Cisco FMC Backup File as Validated"
+    #   command: "mv {{ latest_file.path }} {{ latest_file.path | regex_replace('.tar$','')}}_Validated{{ file_extention }}"
+    #   when: validation_results is succeeded
+
+  #------------------------------------------------------------------------------------------------
+
+- name: Backup Server
+  hosts: backupServer
+  vars:
+    mountpoint: '/'
+    mount: "{{ ansible_mounts  | selectattr('mount', 'equalto', mountpoint) | first }}"
+    disk_available_percentage: "{{ ((mount.size_available|int /mount.size_total|int) * 100)|int }}"
+    file_extention: ".tar"
+    remove_files_older_than_days: "6"
+    disk_warning_percentage: "95"
+    backup_dir: "/home/djordje/backups"
+    client_name: "CiscoFMC/"
+
+  tasks:
+         
+    #This task is a cleanup task which looks for any file older than X days
+    - name: Find Files Older Than {{remove_files_older_than_days}} Days (Backup Server)
+      find:
+        paths: "{{ backup_dir }}/{{ client_name }}"
+        patterns: "*{{ file_extention }}"
+        #use_regex: true
+        age: "{{remove_files_older_than_days}}d"
+      register: files_to_delete
+
+    - name: See the files ----->
+      debug:
+        msg: "These are the files: {{ item.path }}"
+      with_items: "{{files_to_delete.files}}"
+
+    #This Task deletes all the files found by above task
+    # - name: Delete files older than {{remove_files_older_than_days}} days  (Backup Server)
+    #   file:
+    #     path: "{{ item.path }}"
+    #     state: absent
+    #   with_items: "{{ files_to_delete.files }}"
+
+      #This Task fails the task if disk space is lower than the specified limit
+    - name: Ensure Disk Space On Backup Server is Under Warning Limit
+      assert:
+        that: disk_available_percentage|int  < disk_warning_percentage|int 
+        success_msg: "Available disk space percentage is {{ disk_available_percentage }}"
+        fail_msg: "Not enough disk space. Available disk space percentage is {{ disk_available_percentage }}"

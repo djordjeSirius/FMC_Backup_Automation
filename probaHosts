@@ -1,0 +1,14 @@
+[fmcServer]
+172.16.213.206
+
+
+[backupServer]
+172.16.213.206
+
+
+[all:vars]
+ansible_user=djordje
+ansible_password=djoksdjoks
+backup_dir: /home/djordje/backups
+client_name: CiscoFMC/
+file_extention: ".tar"

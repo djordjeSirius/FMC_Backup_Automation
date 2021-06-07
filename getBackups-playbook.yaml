@@ -1,0 +1,36 @@
+---
+- name: Cisco FMC Backup
+  hosts: fmcServer
+  gather_facts: yes
+  vars:
+    path_backup_dir: "/var/sf/backup/"
+    backup_file_pattern: "*.tar"
+    age_created_lessOrEqual_then: "7"
+  tasks:
+    - name: List files in Backup Directory on FMC
+      find: 
+        paths: "{{ path_backup_dir }}"
+        patterns: "{{ backup_file_pattern }}"
+        age: "-{{ age_created_lessOrEqual_then }}d"
+        #use_regex: true
+      register: found_files 
+
+    - name: Testing the results
+      debug:
+        msg: "This is the result: {{found_files.files[0]}}"
+ 
+    - name: Check if we found some files
+      assert:
+        that:
+          -  found_files is succeeded
+          -  found_files.matched > 0
+        fail_msg: "No Backup Files Found on FMC"
+        success_msg: "{{found_files.matched}} files found that match given criteria!"
+
+    - name: Save Backup File
+      set_fact:
+        latest_source_file: "{{found_files.files  |  sort(attribute='mtime',reverse=true) | first }}"
+     
+    - name: See the results
+      debug:
+        msg: "{{latest_source_file}}"
