@@ -49,7 +49,7 @@
 
     - name: Get the size of file
       set_fact:
-        size_of_backup_file: "{{informationAboutFile.stdout_lines[0] | split('M') | first}}"
+        size_of_backup_file: "{{informationAboutFile.stdout_lines[0].split('M')[0]}}"
    
 
     #Note: you can only test -t with tgz as it compreses the file and keep meta data. if its only tar its just a wrapper around the file, so no meta
